@@ -12,8 +12,21 @@ import sqlite3
 import numpy as np
 from pathlib import Path
 
-_HERE      = Path(__file__).parent
-HOSPITAL_DB = _HERE.parent / "hospital_workflow_system" / "outputs" / "hospital.db"
+_HERE = Path(__file__).parent
+
+# Search for hospital DB in common locations (works both standalone and inside main repo)
+def _find_hospital_db() -> Path:
+    candidates = [
+        _HERE.parent / "hospital_workflow_system" / "outputs" / "hospital.db",   # inside main repo
+        Path("C:/Users/ADMIN/Desktop/Binu - IoMT/hospital_workflow_system/outputs/hospital.db"),  # absolute fallback
+        _HERE / "hospital_workflow_system" / "outputs" / "hospital.db",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return candidates[0]  # return first (will fail gracefully via is_available())
+
+HOSPITAL_DB = _find_hospital_db()
 
 # Physiological defaults for imputation when a department lacks a reading
 _DEFAULTS = {

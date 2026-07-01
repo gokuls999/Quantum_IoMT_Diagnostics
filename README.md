@@ -102,6 +102,21 @@ Open `http://localhost:8504`
 
 ---
 
+## Datasets
+
+The dashboard supports three data sources (selectable in the sidebar):
+
+| Source | Records | Description |
+|--------|---------|-------------|
+| Synthetic | configurable | Parameterised biosignal generation |
+| UCI Heart Disease | 303 patients | Cleveland clinical dataset (13 features) |
+| Kaggle Heart Attack | 1,025 patients | Heart attack prediction dataset |
+| Combined | ~1,190 patients | UCI + Kaggle merged, duplicates removed |
+
+Clinical features (trestbps, thalach, oldpeak, etc.) are mapped to time-series ECG, BP, Temperature, EEG, and SpO₂ signals compatible with the ANUKF → VQC pipeline.
+
+---
+
 ## File Structure
 
 ```
@@ -112,6 +127,7 @@ Open `http://localhost:8504`
 ├── bmoco.py              — Binary Multi-Objective Cheetah Optimization
 ├── rbwka.py              — Revamped Black-Winged Kite Algorithm
 ├── data_generator.py     — Synthetic multimodal biosignal generation
+├── real_data_loader.py   — UCI Heart Disease / Kaggle dataset loader
 ├── hospital_bridge.py    — Optional: live MediCore HMS data integration
 └── requirements.txt
 ```

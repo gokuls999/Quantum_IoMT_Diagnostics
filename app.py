@@ -275,6 +275,10 @@ if "results_synthetic" not in st.session_state:
     st.session_state["results_synthetic"] = None
 if "results_hospital" not in st.session_state:
     st.session_state["results_hospital"] = None
+if "results_real" not in st.session_state:
+    st.session_state["results_real"] = None
+if "dataset_source" not in st.session_state:
+    st.session_state["dataset_source"] = "synthetic"
 
 hosp_available = hb.is_available()
 hosp_connected = st.session_state["hospital_connected"]
@@ -371,20 +375,57 @@ st.sidebar.markdown(
 # When connected, patient slider is disabled (count comes from hospital)
 if hosp_connected:
     n_patients = None
+    dataset_source = "hospital"
     st.sidebar.markdown(
         '<div style="font-size:.74rem;color:#64748b;margin-bottom:.4rem">'
         'Patient count: from hospital DB</div>',
         unsafe_allow_html=True,
     )
 else:
-    n_patients = st.sidebar.slider("Patients (synthetic)", 30, 100, 60, step=10)
+    _ds_options  = ["Synthetic", "UCI Heart Disease", "Kaggle Heart Attack", "Combined (UCI + Kaggle)"]
+    _ds_keys     = ["synthetic", "uci", "kaggle", "combined"]
+    _ds_idx      = _ds_keys.index(st.session_state["dataset_source"]) if st.session_state["dataset_source"] in _ds_keys else 0
+    _ds_choice   = st.sidebar.selectbox("Data Source", _ds_options, index=_ds_idx)
+    dataset_source = _ds_keys[_ds_options.index(_ds_choice)]
+    st.session_state["dataset_source"] = dataset_source
+
+    if dataset_source == "synthetic":
+        n_patients = st.sidebar.slider("Patients", 30, 100, 60, step=10)
+    else:
+        from real_data_loader import DATASETS, is_cached, dataset_info as _ds_info
+        _info = _ds_info(dataset_source)
+        n_patients = st.sidebar.slider(
+            "Max patients (0 = all)", 0, 200, 0, step=10,
+            help="0 loads the full dataset"
+        )
+        n_patients = None if n_patients == 0 else n_patients
+        _cached_tag = "cached" if is_cached(dataset_source) else "will download"
+        st.sidebar.markdown(
+            f'<div style="font-size:.72rem;color:#64748b;margin:.2rem 0 .5rem">'
+            f'{_info["records"]} &nbsp;·&nbsp; {_cached_tag}</div>',
+            unsafe_allow_html=True,
+        )
 
 fast_mode = st.sidebar.checkbox("Fast mode (fewer iterations)", value=True)
 seed      = st.sidebar.number_input("Random seed", value=42, step=1)
 
 # Data source badge
-src_label = "MediCore HMS" if hosp_connected else "Synthetic data"
-src_color = "#16a34a"      if hosp_connected else "#64748b"
+_src_labels = {
+    "synthetic": "Synthetic data",
+    "uci":       "UCI Heart Disease",
+    "kaggle":    "Kaggle Heart Attack",
+    "combined":  "UCI + Kaggle (Combined)",
+    "hospital":  "MediCore HMS",
+}
+_src_colors = {
+    "synthetic": "#64748b",
+    "uci":       "#7c3aed",
+    "kaggle":    "#0891b2",
+    "combined":  "#0891b2",
+    "hospital":  "#16a34a",
+}
+src_label = _src_labels.get(dataset_source, "Synthetic data")
+src_color = _src_colors.get(dataset_source, "#64748b")
 st.sidebar.markdown(
     f'<div style="font-size:.72rem;color:{src_color};margin-bottom:.5rem">'
     f'Data source: <strong>{src_label}</strong></div>',
@@ -465,11 +506,9 @@ with _a3:
     )
 
 # Status dot
-_src_color = "#16a34a" if hosp_connected else "#64748b"
-_src_label  = "MediCore HMS" if hosp_connected else "Synthetic data"
 _a1.markdown(
-    f'<div style="font-size:.72rem;color:{_src_color};padding:.35rem 0">'
-    f'&#9679; {_src_label}</div>',
+    f'<div style="font-size:.72rem;color:{src_color};padding:.35rem 0">'
+    f'&#9679; {src_label}</div>',
     unsafe_allow_html=True,
 )
 
@@ -511,15 +550,33 @@ if run_btn or run_btn_main:
             result["_source"]    = "hospital"
             result["_dept_rows"] = dept_rows
             st.session_state["results_hospital"] = result
+        elif dataset_source != "synthetic":
+            from real_data_loader import load_dataset
+            with st.spinner(f"Loading {src_label} dataset…"):
+                real_patients, real_df = load_dataset(
+                    source=dataset_source,
+                    max_patients=n_patients,
+                    seed=int(seed),
+                )
+            result = _execute_pipeline(int(seed), fast_mode,
+                                       hospital_patients=real_patients,
+                                       n_patients=len(real_patients))
+            result["_source"]    = dataset_source
+            result["_real_df"]   = real_df
+            st.session_state["results_real"] = result
         else:
             result = _execute_pipeline(int(seed), fast_mode,
                                        n_patients=n_patients or 60)
             result["_source"] = "synthetic"
             st.session_state["results_synthetic"] = result
 
-# Active result = hospital if connected, else synthetic
-R = (st.session_state["results_hospital"] if hosp_connected
-     else st.session_state["results_synthetic"])
+# Active result: hospital > real > synthetic
+if hosp_connected:
+    R = st.session_state["results_hospital"]
+elif dataset_source != "synthetic":
+    R = st.session_state["results_real"]
+else:
+    R = st.session_state["results_synthetic"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

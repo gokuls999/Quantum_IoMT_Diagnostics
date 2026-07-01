@@ -10,3 +10,4 @@ outputs/
 Thumbs.db
 .vscode/
 .idea/
+.dataset_cache/
